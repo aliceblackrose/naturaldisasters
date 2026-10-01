@@ -450,14 +450,15 @@ public final class DisasterController {
 
   private List<Player> eligiblePlayers() {
     List<String> configuredWorlds = plugin.getConfig().getStringList("rounds.worlds");
-    return plugin.getServer().getOnlinePlayers().stream()
-        .filter(player -> isEligibleGameMode(player.getGameMode()))
-        .filter(
-            player ->
-                configuredWorlds.isEmpty()
-                    || configuredWorlds.contains(player.getWorld().getName()))
-        .filter(player -> !player.isDead())
-        .toList();
+    List<Player> players = new ArrayList<>();
+    for (Player player : plugin.getServer().getOnlinePlayers()) {
+      boolean worldAllowed =
+          configuredWorlds.isEmpty() || configuredWorlds.contains(player.getWorld().getName());
+      if (isEligibleGameMode(player.getGameMode()) && worldAllowed && !player.isDead()) {
+        players.add(player);
+      }
+    }
+    return List.copyOf(players);
   }
 
   private static boolean isEligibleGameMode(GameMode gameMode) {
@@ -490,8 +491,7 @@ public final class DisasterController {
   private void resetToIntermission() {
     clearRoundState();
     phase = Phase.INTERMISSION;
-    phaseTicks =
-        secondsToTicks(plugin.getConfig().getInt("rounds.intermission-seconds", 30));
+    phaseTicks = secondsToTicks(plugin.getConfig().getInt("rounds.intermission-seconds", 30));
   }
 
   private void endActiveEffects() {
