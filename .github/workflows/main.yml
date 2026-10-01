@@ -28,4 +28,9 @@ jobs:
 
       - uses: gradle/actions/setup-gradle@v5
 
+      - name: Apply formatter and show patch
+        run: |
+          ./gradlew spotlessApply
+          git diff -- src/main/java src/test/java
+
       - run: ./gradlew build --warning-mode all
