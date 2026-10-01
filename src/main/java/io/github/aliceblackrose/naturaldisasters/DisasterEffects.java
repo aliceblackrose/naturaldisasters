@@ -33,8 +33,7 @@ final class DisasterEffects {
     }
   }
 
-  void tick(
-      DisasterType disaster, List<Player> players, int elapsedTicks, int totalDurationTicks) {
+  void tick(DisasterType disaster, List<Player> players, int elapsedTicks, int totalDurationTicks) {
     switch (disaster) {
       case EARTHQUAKE -> tickEarthquake(players, elapsedTicks);
       case ACID_RAIN -> tickAcidRain(players, elapsedTicks);
@@ -91,10 +90,7 @@ final class DisasterEffects {
     int interval =
         secondsToTicks(
             Math.max(
-                1,
-                plugin
-                    .getConfig()
-                    .getInt("disasters.lightning-storm.interval-seconds", 2)));
+                1, plugin.getConfig().getInt("disasters.lightning-storm.interval-seconds", 2)));
     if (elapsedTicks % interval != 0) {
       return;
     }
@@ -116,9 +112,7 @@ final class DisasterEffects {
   private void tickMeteorShower(List<Player> players, int elapsedTicks) {
     int interval =
         secondsToTicks(
-            Math.max(
-                1,
-                plugin.getConfig().getInt("disasters.meteor-shower.interval-seconds", 2)));
+            Math.max(1, plugin.getConfig().getInt("disasters.meteor-shower.interval-seconds", 2)));
     if (elapsedTicks % interval != 0 || players.isEmpty()) {
       return;
     }
@@ -139,8 +133,7 @@ final class DisasterEffects {
   private void prepareFlood(List<Player> players) {
     Map<World, List<Player>> byWorld =
         players.stream().collect(Collectors.groupingBy(Player::getWorld));
-    int rise =
-        Math.max(8, plugin.getConfig().getInt("disasters.flash-flood.rise-blocks", 18));
+    int rise = Math.max(8, plugin.getConfig().getInt("disasters.flash-flood.rise-blocks", 18));
     for (Map.Entry<World, List<Player>> entry : byWorld.entrySet()) {
       floodRanges.put(entry.getKey(), floodRange(entry.getValue(), rise));
     }
@@ -154,8 +147,7 @@ final class DisasterEffects {
     return new FloodRange(minimum - 4, Math.max(minimum + rise, maximum + 8));
   }
 
-  private void tickFlashFlood(
-      List<Player> players, int elapsedTicks, int totalDurationTicks) {
+  private void tickFlashFlood(List<Player> players, int elapsedTicks, int totalDurationTicks) {
     if (elapsedTicks % TICKS_PER_SECOND != 0) {
       return;
     }
@@ -189,8 +181,7 @@ final class DisasterEffects {
     if (elapsedTicks % TICKS_PER_SECOND == 0) {
       driftTornadoCenters();
     }
-    double radius =
-        Math.max(4.0, plugin.getConfig().getDouble("disasters.tornado.radius", 24.0));
+    double radius = Math.max(4.0, plugin.getConfig().getDouble("disasters.tornado.radius", 24.0));
     double strength = plugin.getConfig().getDouble("disasters.tornado.pull-strength", 0.45);
     double lift = plugin.getConfig().getDouble("disasters.tornado.lift", 0.25);
     double damage = plugin.getConfig().getDouble("disasters.tornado.damage", 1.0);
@@ -224,8 +215,7 @@ final class DisasterEffects {
 
   private boolean isExposedToSky(Player player) {
     Location location = player.getLocation();
-    int highest =
-        player.getWorld().getHighestBlockYAt(location.getBlockX(), location.getBlockZ());
+    int highest = player.getWorld().getHighestBlockYAt(location.getBlockX(), location.getBlockZ());
     return location.getBlockY() > highest;
   }
 

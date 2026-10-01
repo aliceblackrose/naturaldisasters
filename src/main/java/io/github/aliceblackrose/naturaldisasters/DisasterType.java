@@ -11,9 +11,7 @@ public enum DisasterType {
       "Earthquake",
       "Keep moving and avoid high ledges while the ground throws you around."),
   ACID_RAIN(
-      "acid-rain",
-      "Acid Rain",
-      "Get under a solid roof. Players exposed to the sky take damage."),
+      "acid-rain", "Acid Rain", "Get under a solid roof. Players exposed to the sky take damage."),
   LIGHTNING_STORM(
       "lightning-storm",
       "Lightning Storm",

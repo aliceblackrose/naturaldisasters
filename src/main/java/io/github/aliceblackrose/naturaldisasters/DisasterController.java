@@ -93,8 +93,7 @@ public final class DisasterController {
     return switch (phase) {
       case IDLE -> "idle";
       case INTERMISSION -> "intermission (" + seconds + "s)";
-      case WARNING ->
-          "warning for " + displayName(queuedDisaster) + " (" + seconds + "s)";
+      case WARNING -> "warning for " + displayName(queuedDisaster) + " (" + seconds + "s)";
       case ACTIVE ->
           displayName(activeDisaster)
               + " active ("
@@ -209,8 +208,7 @@ public final class DisasterController {
     int survivors = survivorCount();
     int total = participants.size();
     broadcast(
-        "Round over! " + survivors + "/" + total + " participants survived.",
-        NamedTextColor.GREEN);
+        "Round over! " + survivors + "/" + total + " participants survived.", NamedTextColor.GREEN);
   }
 
   private int survivorCount() {

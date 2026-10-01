@@ -116,8 +116,7 @@ public final class NaturalDisastersPlugin extends JavaPlugin implements Listener
 
   private boolean handleStart(CommandSender sender, String[] args) {
     if (args.length < START_ARGUMENT_COUNT) {
-      sender.sendMessage(
-          Component.text("Usage: /disaster start <type>", NamedTextColor.YELLOW));
+      sender.sendMessage(Component.text("Usage: /disaster start <type>", NamedTextColor.YELLOW));
       return true;
     }
     DisasterType disaster = DisasterType.fromKey(args[1]).orElse(null);
