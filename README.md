@@ -1,28 +1,56 @@
-# Paper Plugin Template
+# Natural Disasters
 
-Minimal Java 25 template for Paper 26.1 plugins. It keeps only the pieces needed to compile, test, lint, format, run, and package a plugin.
+A Paper 26.1 survival-round plugin inspired by the disaster loop in Roblox's
+Natural Disaster Survival. It is an original implementation for Minecraft and
+does not include Roblox code or assets.
+
+## Gameplay
+
+The plugin runs repeating rounds:
+
+1. Intermission while players prepare.
+2. A random disaster is announced with a survival hint.
+3. Players get a short warning countdown.
+4. The disaster runs for the configured duration.
+5. Players who die during the round are eliminated and survivors are counted.
+
+Included disasters:
+
+- **Earthquake** - repeated horizontal knockback and chip damage.
+- **Acid Rain** - exposed players take damage; solid overhead cover protects them.
+- **Lightning Storm** - exposed survivors are targeted by lightning.
+- **Meteor Shower** - explosions land near randomly selected survivors.
+- **Flash Flood** - a virtual flood line rises throughout the round; climb upward.
+- **Tornado** - moving funnels pull and lift nearby survivors.
+
+Terrain destruction is off by default. Set `disasters.block-damage: true` if you
+want meteor explosions and lightning to affect the map.
 
 ## Commands
 
+- `/disaster status` - show the current phase, timer, and survivor count.
+- `/disaster list` - show disasters enabled for random selection.
+- `/disaster start <type>` - immediately start a specific disaster (op/admin).
+- `/disaster stop` - stop the current warning or round (op/admin).
+- `/disaster reload` - reload `config.yml` (op/admin).
+
+The admin permission is `naturaldisasters.admin` and defaults to operators.
+
+## Configuration
+
+Edit `plugins/NaturalDisasters/config.yml` to change round timers, minimum
+players, eligible worlds, disaster damage, intervals, radius/strength, and block
+damage behavior. Leaving `rounds.worlds` empty enables the plugin in every world.
+
+## Development
+
 ```bash
-./gradlew build          # compile, test, PMD, formatting checks, package
-./gradlew spotlessApply # format Java sources
-./gradlew runServer     # start a local Paper server
+./gradlew build
+./gradlew spotlessApply
+./gradlew runServer
 ```
 
-## Use this template
-
-1. Change `rootProject.name` in `settings.gradle`.
-2. Change `group` and `version` in `build.gradle`.
-3. Rename `io.github.aliceblackrose.template.TemplatePlugin` and its package.
-4. Update `src/main/resources/plugin.yml` to match the new entry point and metadata.
-5. Add only the configuration, dependencies, and tests required by real behavior.
-
-## Code policy
-
-The build treats compiler warnings as errors, runs PMD static analysis, and enforces Google Java Format through Spotless. The rules are intended to cover the enforceable parts of the JPL Java coding guidance: explicit and simple code, static analysis, documented public code, unit testing, defensive error handling, and low complexity.
-
-There are deliberately no placeholder services, sample configuration files, architecture layers, or fake tests in the template.
+The project targets Java 25 and Paper 26.1.
 
 ## License
 

@@ -1,6 +1,20 @@
-name: TemplatePlugin
+name: NaturalDisasters
 version: '${version}'
-main: io.github.aliceblackrose.template.TemplatePlugin
+main: io.github.aliceblackrose.naturaldisasters.NaturalDisastersPlugin
 api-version: '26.1'
 author: aliceblackrose
-description: Minimal Paper plugin template
+description: Roblox-inspired natural disaster survival rounds for Paper
+commands:
+  disaster:
+    description: View or control Natural Disasters rounds
+    usage: /disaster <status|list|start|stop|reload>
+    permission: naturaldisasters.use
+permissions:
+  naturaldisasters.use:
+    description: Allows access to Natural Disasters status and list commands
+    default: true
+  naturaldisasters.admin:
+    description: Allows starting, stopping, and reloading disaster rounds
+    default: op
+    children:
+      naturaldisasters.use: true
