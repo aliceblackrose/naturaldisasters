@@ -1,0 +1,6 @@
+name: TemplatePlugin
+version: '${version}'
+main: io.github.aliceblackrose.template.TemplatePlugin
+api-version: '26.1'
+author: aliceblackrose
+description: Minimal Paper plugin template

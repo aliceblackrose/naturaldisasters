@@ -1,0 +1,19 @@
+# Gradle
+.gradle/
+build/
+
+# Paper development server
+run/
+runs/
+
+# IDEs
+.idea/
+*.iml
+.vscode/
+.classpath
+.project
+.settings/
+
+# OS files
+.DS_Store
+Thumbs.db
