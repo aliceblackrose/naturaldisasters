@@ -15,6 +15,15 @@ import org.bukkit.plugin.java.JavaPlugin;
 
 /** Paper entry point for the Natural Disasters survival-round plugin. */
 public final class NaturalDisastersPlugin extends JavaPlugin implements Listener {
+  private static final String ADMIN_PERMISSION = "naturaldisasters.admin";
+  private static final String STATUS_COMMAND = "status";
+  private static final String LIST_COMMAND = "list";
+  private static final String START_COMMAND = "start";
+  private static final String STOP_COMMAND = "stop";
+  private static final String RELOAD_COMMAND = "reload";
+  private static final int ROOT_ARGUMENT_COUNT = 1;
+  private static final int START_ARGUMENT_COUNT = 2;
+
   private DisasterController controller;
 
   @Override
@@ -58,24 +67,24 @@ public final class NaturalDisastersPlugin extends JavaPlugin implements Listener
     }
 
     String subcommand = args[0].toLowerCase(Locale.ROOT);
-    if ("status".equals(subcommand)) {
+    if (STATUS_COMMAND.equals(subcommand)) {
       sender.sendMessage(
           Component.text("Natural Disasters: " + controller.status(), NamedTextColor.GOLD));
       return true;
     }
-    if ("list".equals(subcommand)) {
+    if (LIST_COMMAND.equals(subcommand)) {
       sendDisasterList(sender);
       return true;
     }
-    if (!sender.hasPermission("naturaldisasters.admin")) {
+    if (!sender.hasPermission(ADMIN_PERMISSION)) {
       sender.sendMessage(Component.text("You do not have permission.", NamedTextColor.RED));
       return true;
     }
 
     return switch (subcommand) {
-      case "start" -> handleStart(sender, args);
-      case "stop" -> handleStop(sender);
-      case "reload" -> handleReload(sender);
+      case START_COMMAND -> handleStart(sender, args);
+      case STOP_COMMAND -> handleStop(sender);
+      case RELOAD_COMMAND -> handleReload(sender);
       default -> {
         sendHelp(sender);
         yield true;
@@ -86,16 +95,16 @@ public final class NaturalDisastersPlugin extends JavaPlugin implements Listener
   @Override
   public List<String> onTabComplete(
       CommandSender sender, Command command, String alias, String[] args) {
-    if (args.length == 1) {
-      List<String> options = new ArrayList<>(List.of("status", "list"));
-      if (sender.hasPermission("naturaldisasters.admin")) {
-        options.addAll(List.of("start", "stop", "reload"));
+    if (args.length == ROOT_ARGUMENT_COUNT) {
+      List<String> options = new ArrayList<>(List.of(STATUS_COMMAND, LIST_COMMAND));
+      if (sender.hasPermission(ADMIN_PERMISSION)) {
+        options.addAll(List.of(START_COMMAND, STOP_COMMAND, RELOAD_COMMAND));
       }
       return matching(options, args[0]);
     }
-    if (args.length == 2
-        && "start".equalsIgnoreCase(args[0])
-        && sender.hasPermission("naturaldisasters.admin")) {
+    if (args.length == START_ARGUMENT_COUNT
+        && START_COMMAND.equalsIgnoreCase(args[0])
+        && sender.hasPermission(ADMIN_PERMISSION)) {
       List<String> keys =
           controller == null
               ? List.of()
@@ -106,7 +115,7 @@ public final class NaturalDisastersPlugin extends JavaPlugin implements Listener
   }
 
   private boolean handleStart(CommandSender sender, String[] args) {
-    if (args.length < 2) {
+    if (args.length < START_ARGUMENT_COUNT) {
       sender.sendMessage(
           Component.text("Usage: /disaster start <type>", NamedTextColor.YELLOW));
       return true;
@@ -153,7 +162,7 @@ public final class NaturalDisastersPlugin extends JavaPlugin implements Listener
     sender.sendMessage(Component.text("Natural Disasters commands", NamedTextColor.GOLD));
     sender.sendMessage(Component.text("/disaster status", NamedTextColor.YELLOW));
     sender.sendMessage(Component.text("/disaster list", NamedTextColor.YELLOW));
-    if (sender.hasPermission("naturaldisasters.admin")) {
+    if (sender.hasPermission(ADMIN_PERMISSION)) {
       sender.sendMessage(Component.text("/disaster start <type>", NamedTextColor.YELLOW));
       sender.sendMessage(Component.text("/disaster stop", NamedTextColor.YELLOW));
       sender.sendMessage(Component.text("/disaster reload", NamedTextColor.YELLOW));

@@ -2,66 +2,59 @@ package io.github.aliceblackrose.naturaldisasters;
 
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
-import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ThreadLocalRandom;
-import java.util.stream.Collectors;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
 import org.bukkit.GameMode;
-import org.bukkit.Location;
-import org.bukkit.World;
 import org.bukkit.entity.Player;
 import org.bukkit.scheduler.BukkitTask;
-import org.bukkit.util.Vector;
 
-/** Owns the round loop and applies all disaster effects on the server thread. */
+/** Owns the survival-round state machine and delegates hazard effects. */
 public final class DisasterController {
   private static final int TICKS_PER_SECOND = 20;
   private static final int STEP_TICKS = 5;
 
   private final NaturalDisastersPlugin plugin;
+  private final DisasterEffects effects;
   private final Set<UUID> participants = new HashSet<>();
   private final Set<UUID> eliminated = new HashSet<>();
-  private final Map<World, FloodRange> floodRanges = new HashMap<>();
-  private final Map<World, Location> tornadoCenters = new HashMap<>();
 
-  private BukkitTask task;
+  private Optional<BukkitTask> task = Optional.empty();
   private Phase phase = Phase.IDLE;
-  private DisasterType queuedDisaster;
-  private DisasterType activeDisaster;
+  private Optional<DisasterType> queuedDisaster = Optional.empty();
+  private Optional<DisasterType> activeDisaster = Optional.empty();
   private int phaseTicks;
   private int activeElapsedTicks;
 
   /** Creates a controller bound to the owning plugin. */
   public DisasterController(NaturalDisastersPlugin plugin) {
     this.plugin = plugin;
+    effects = new DisasterEffects(plugin);
   }
 
   /** Starts the repeating automatic round loop if it is enabled in configuration. */
   public void startLoop() {
-    if (task != null) {
+    if (task.isPresent()) {
       return;
     }
     resetToIntermission();
     task =
-        plugin
-            .getServer()
-            .getScheduler()
-            .runTaskTimer(plugin, this::tick, STEP_TICKS, STEP_TICKS);
+        Optional.of(
+            plugin
+                .getServer()
+                .getScheduler()
+                .runTaskTimer(plugin, this::tick, STEP_TICKS, STEP_TICKS));
   }
 
   /** Cancels all scheduled work and clears the current round. */
   public void shutdown() {
-    if (task != null) {
-      task.cancel();
-      task = null;
-    }
+    task.ifPresent(BukkitTask::cancel);
+    task = Optional.empty();
     clearRoundState();
     phase = Phase.IDLE;
     phaseTicks = 0;
@@ -70,7 +63,7 @@ public final class DisasterController {
   /** Starts a selected disaster immediately, interrupting any countdown or active round. */
   public void startImmediate(DisasterType disaster) {
     endActiveEffects();
-    queuedDisaster = null;
+    queuedDisaster = Optional.empty();
     beginDisaster(disaster);
   }
 
@@ -101,9 +94,9 @@ public final class DisasterController {
       case IDLE -> "idle";
       case INTERMISSION -> "intermission (" + seconds + "s)";
       case WARNING ->
-          "warning for " + safeDisplayName(queuedDisaster) + " (" + seconds + "s)";
+          "warning for " + displayName(queuedDisaster) + " (" + seconds + "s)";
       case ACTIVE ->
-          safeDisplayName(activeDisaster)
+          displayName(activeDisaster)
               + " active ("
               + seconds
               + "s remaining, "
@@ -134,7 +127,6 @@ public final class DisasterController {
     if (phaseTicks > 0) {
       return;
     }
-
     if (eligiblePlayers().size() < minimumPlayers()) {
       phaseTicks = secondsToTicks(5);
       return;
@@ -145,11 +137,12 @@ public final class DisasterController {
       phaseTicks = secondsToTicks(10);
       return;
     }
-    queuedDisaster = selected.orElseThrow();
+    queuedDisaster = selected;
+    DisasterType disaster = selected.orElseThrow();
     phase = Phase.WARNING;
     phaseTicks = secondsToTicks(plugin.getConfig().getInt("rounds.warning-seconds", 10));
-    broadcast("Next disaster: " + queuedDisaster.displayName(), NamedTextColor.RED);
-    broadcast(queuedDisaster.survivalTip(), NamedTextColor.YELLOW);
+    broadcast("Next disaster: " + disaster.displayName(), NamedTextColor.RED);
+    broadcast(disaster.survivalTip(), NamedTextColor.YELLOW);
   }
 
   private void tickWarning() {
@@ -162,13 +155,13 @@ public final class DisasterController {
       return;
     }
 
-    DisasterType disaster = queuedDisaster;
-    queuedDisaster = null;
-    if (disaster == null) {
+    Optional<DisasterType> selected = queuedDisaster;
+    queuedDisaster = Optional.empty();
+    if (selected.isEmpty()) {
       resetToIntermission();
       return;
     }
-    beginDisaster(disaster);
+    beginDisaster(selected.orElseThrow());
   }
 
   private void beginDisaster(DisasterType disaster) {
@@ -184,24 +177,23 @@ public final class DisasterController {
       participants.add(player.getUniqueId());
     }
 
-    activeDisaster = disaster;
+    activeDisaster = Optional.of(disaster);
     activeElapsedTicks = 0;
     phase = Phase.ACTIVE;
     phaseTicks = secondsToTicks(plugin.getConfig().getInt("rounds.duration-seconds", 90));
-    prepareDisaster(disaster, players);
-
+    effects.prepare(disaster, players);
     broadcast(disaster.displayName() + " has started!", NamedTextColor.RED);
     broadcast(disaster.survivalTip(), NamedTextColor.YELLOW);
   }
 
   private void tickActive() {
-    DisasterType disaster = activeDisaster;
-    if (disaster == null) {
+    if (activeDisaster.isEmpty()) {
       resetToIntermission();
       return;
     }
 
-    applyDisaster(disaster);
+    DisasterType disaster = activeDisaster.orElseThrow();
+    effects.tick(disaster, activePlayers(), activeElapsedTicks, activeElapsedTicks + phaseTicks);
     activeElapsedTicks += STEP_TICKS;
     phaseTicks -= STEP_TICKS;
     if (phaseTicks > 0) {
@@ -211,204 +203,6 @@ public final class DisasterController {
     announceRoundEnd();
     endActiveEffects();
     resetToIntermission();
-  }
-
-  private void prepareDisaster(DisasterType disaster, List<Player> players) {
-    floodRanges.clear();
-    tornadoCenters.clear();
-    if (disaster == DisasterType.FLASH_FLOOD) {
-      prepareFlood(players);
-    } else if (disaster == DisasterType.TORNADO) {
-      prepareTornado(players);
-    }
-  }
-
-  private void applyDisaster(DisasterType disaster) {
-    switch (disaster) {
-      case EARTHQUAKE -> tickEarthquake();
-      case ACID_RAIN -> tickAcidRain();
-      case LIGHTNING_STORM -> tickLightningStorm();
-      case METEOR_SHOWER -> tickMeteorShower();
-      case FLASH_FLOOD -> tickFlashFlood();
-      case TORNADO -> tickTornado();
-    }
-  }
-
-  private void tickEarthquake() {
-    if (activeElapsedTicks % 10 != 0) {
-      return;
-    }
-    double strength = plugin.getConfig().getDouble("disasters.earthquake.knockback", 0.35);
-    double damage = plugin.getConfig().getDouble("disasters.earthquake.damage", 1.0);
-    ThreadLocalRandom random = ThreadLocalRandom.current();
-    for (Player player : activePlayers()) {
-      Vector shake =
-          new Vector(
-              random.nextDouble(-strength, strength),
-              random.nextDouble(0.05, 0.18),
-              random.nextDouble(-strength, strength));
-      player.setVelocity(player.getVelocity().add(shake));
-      if (activeElapsedTicks % TICKS_PER_SECOND == 0 && damage > 0.0) {
-        player.damage(damage);
-      }
-    }
-  }
-
-  private void tickAcidRain() {
-    if (activeElapsedTicks % TICKS_PER_SECOND != 0) {
-      return;
-    }
-    double damage = plugin.getConfig().getDouble("disasters.acid-rain.damage", 2.0);
-    for (Player player : activePlayers()) {
-      if (isExposedToSky(player)) {
-        player.damage(damage);
-        player.sendActionBar(Component.text("ACID RAIN - FIND COVER", NamedTextColor.GREEN));
-      } else {
-        player.sendActionBar(Component.text("Sheltered from acid rain", NamedTextColor.GRAY));
-      }
-    }
-  }
-
-  private void tickLightningStorm() {
-    int interval =
-        secondsToTicks(
-            Math.max(
-                1,
-                plugin
-                    .getConfig()
-                    .getInt("disasters.lightning-storm.interval-seconds", 2)));
-    if (activeElapsedTicks % interval != 0) {
-      return;
-    }
-
-    List<Player> exposed = activePlayers().stream().filter(this::isExposedToSky).toList();
-    if (exposed.isEmpty()) {
-      return;
-    }
-    Player target = exposed.get(ThreadLocalRandom.current().nextInt(exposed.size()));
-    boolean destructive = plugin.getConfig().getBoolean("disasters.block-damage", false);
-    if (destructive) {
-      target.getWorld().strikeLightning(target.getLocation());
-    } else {
-      target.getWorld().strikeLightningEffect(target.getLocation());
-      target.damage(plugin.getConfig().getDouble("disasters.lightning-storm.damage", 5.0));
-    }
-  }
-
-  private void tickMeteorShower() {
-    int interval =
-        secondsToTicks(
-            Math.max(
-                1,
-                plugin.getConfig().getInt("disasters.meteor-shower.interval-seconds", 2)));
-    if (activeElapsedTicks % interval != 0) {
-      return;
-    }
-
-    List<Player> players = activePlayers();
-    if (players.isEmpty()) {
-      return;
-    }
-    Player target = players.get(ThreadLocalRandom.current().nextInt(players.size()));
-    int radius = Math.max(1, plugin.getConfig().getInt("disasters.meteor-shower.radius", 8));
-    ThreadLocalRandom random = ThreadLocalRandom.current();
-    int x = target.getLocation().getBlockX() + random.nextInt(-radius, radius + 1);
-    int z = target.getLocation().getBlockZ() + random.nextInt(-radius, radius + 1);
-    World world = target.getWorld();
-    int y = world.getHighestBlockYAt(x, z) + 1;
-    Location impact = new Location(world, x + 0.5, y, z + 0.5);
-    float power = (float) plugin.getConfig().getDouble("disasters.meteor-shower.power", 3.0);
-    boolean breakBlocks = plugin.getConfig().getBoolean("disasters.block-damage", false);
-    world.createExplosion(impact, power, false, breakBlocks, null);
-  }
-
-  private void prepareFlood(List<Player> players) {
-    Map<World, List<Player>> byWorld =
-        players.stream().collect(Collectors.groupingBy(Player::getWorld));
-    int rise =
-        Math.max(8, plugin.getConfig().getInt("disasters.flash-flood.rise-blocks", 18));
-    for (Map.Entry<World, List<Player>> entry : byWorld.entrySet()) {
-      int minimum =
-          entry.getValue().stream()
-              .mapToInt(player -> player.getLocation().getBlockY())
-              .min()
-              .orElse(0);
-      int maximum =
-          entry.getValue().stream()
-              .mapToInt(player -> player.getLocation().getBlockY())
-              .max()
-              .orElse(0);
-      floodRanges.put(
-          entry.getKey(),
-          new FloodRange(minimum - 4, Math.max(minimum + rise, maximum + 8)));
-    }
-  }
-
-  private void tickFlashFlood() {
-    if (activeElapsedTicks % TICKS_PER_SECOND != 0) {
-      return;
-    }
-    int duration = secondsToTicks(plugin.getConfig().getInt("rounds.duration-seconds", 90));
-    double damage = plugin.getConfig().getDouble("disasters.flash-flood.damage", 3.0);
-    for (Player player : activePlayers()) {
-      FloodRange range = floodRanges.get(player.getWorld());
-      if (range == null) {
-        continue;
-      }
-      int level =
-          DisasterMath.interpolate(range.startY(), range.targetY(), activeElapsedTicks, duration);
-      player.sendActionBar(Component.text("Flood level: Y " + level, NamedTextColor.AQUA));
-      if (player.getLocation().getY() <= level) {
-        player.damage(damage);
-      }
-    }
-  }
-
-  private void prepareTornado(List<Player> players) {
-    Map<World, List<Player>> byWorld =
-        players.stream().collect(Collectors.groupingBy(Player::getWorld));
-    for (Map.Entry<World, List<Player>> entry : byWorld.entrySet()) {
-      List<Player> worldPlayers = entry.getValue();
-      Player seed = worldPlayers.get(ThreadLocalRandom.current().nextInt(worldPlayers.size()));
-      tornadoCenters.put(entry.getKey(), seed.getLocation().clone());
-    }
-  }
-
-  private void tickTornado() {
-    if (activeElapsedTicks % TICKS_PER_SECOND == 0) {
-      driftTornadoCenters();
-    }
-    double radius =
-        Math.max(4.0, plugin.getConfig().getDouble("disasters.tornado.radius", 24.0));
-    double strength = plugin.getConfig().getDouble("disasters.tornado.pull-strength", 0.45);
-    double lift = plugin.getConfig().getDouble("disasters.tornado.lift", 0.25);
-    double damage = plugin.getConfig().getDouble("disasters.tornado.damage", 1.0);
-    for (Player player : activePlayers()) {
-      Location center = tornadoCenters.get(player.getWorld());
-      if (center == null) {
-        continue;
-      }
-      Vector delta = center.toVector().subtract(player.getLocation().toVector());
-      delta.setY(0.0);
-      double distanceSquared = delta.lengthSquared();
-      if (distanceSquared > radius * radius || distanceSquared < 0.01) {
-        continue;
-      }
-      Vector pull = delta.normalize().multiply(strength).setY(lift);
-      player.setVelocity(player.getVelocity().multiply(0.75).add(pull));
-      if (distanceSquared < 16.0 && activeElapsedTicks % TICKS_PER_SECOND == 0) {
-        player.damage(damage);
-      }
-    }
-  }
-
-  private void driftTornadoCenters() {
-    ThreadLocalRandom random = ThreadLocalRandom.current();
-    for (Map.Entry<World, Location> entry : tornadoCenters.entrySet()) {
-      Location center = entry.getValue();
-      center.add(random.nextDouble(-3.0, 3.0), 0.0, random.nextDouble(-3.0, 3.0));
-      center.setY(entry.getKey().getHighestBlockYAt(center) + 1.0);
-    }
   }
 
   private void announceRoundEnd() {
@@ -465,13 +259,6 @@ public final class DisasterController {
     return gameMode == GameMode.SURVIVAL || gameMode == GameMode.ADVENTURE;
   }
 
-  private boolean isExposedToSky(Player player) {
-    Location location = player.getLocation();
-    int highest =
-        player.getWorld().getHighestBlockYAt(location.getBlockX(), location.getBlockZ());
-    return location.getBlockY() > highest;
-  }
-
   private Optional<DisasterType> chooseDisaster() {
     List<DisasterType> enabled = enabledDisasters();
     if (enabled.isEmpty()) {
@@ -495,13 +282,12 @@ public final class DisasterController {
   }
 
   private void endActiveEffects() {
-    activeDisaster = null;
-    floodRanges.clear();
-    tornadoCenters.clear();
+    activeDisaster = Optional.empty();
+    effects.clear();
   }
 
   private void clearRoundState() {
-    queuedDisaster = null;
+    queuedDisaster = Optional.empty();
     endActiveEffects();
     participants.clear();
     eliminated.clear();
@@ -527,8 +313,8 @@ public final class DisasterController {
     return Math.max(1, seconds) * TICKS_PER_SECOND;
   }
 
-  private static String safeDisplayName(DisasterType disaster) {
-    return disaster == null ? "unknown disaster" : disaster.displayName();
+  private static String displayName(Optional<DisasterType> disaster) {
+    return disaster.map(DisasterType::displayName).orElse("unknown disaster");
   }
 
   private enum Phase {
@@ -537,6 +323,4 @@ public final class DisasterController {
     WARNING,
     ACTIVE
   }
-
-  private record FloodRange(int startY, int targetY) {}
 }

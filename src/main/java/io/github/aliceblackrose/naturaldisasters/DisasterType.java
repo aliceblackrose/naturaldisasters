@@ -31,34 +31,34 @@ public enum DisasterType {
       "Tornado",
       "Stay away from the funnel. It pulls nearby survivors toward its center.");
 
-  private final String key;
-  private final String displayName;
-  private final String survivalTip;
+  private final String configKey;
+  private final String title;
+  private final String tip;
 
-  DisasterType(String key, String displayName, String survivalTip) {
-    this.key = key;
-    this.displayName = displayName;
-    this.survivalTip = survivalTip;
+  DisasterType(String configKey, String title, String tip) {
+    this.configKey = configKey;
+    this.title = title;
+    this.tip = tip;
   }
 
   /** Configuration and command key for this disaster. */
   public String key() {
-    return key;
+    return configKey;
   }
 
   /** Human-readable disaster name. */
   public String displayName() {
-    return displayName;
+    return title;
   }
 
   /** Short survival hint shown at the beginning of a round. */
   public String survivalTip() {
-    return survivalTip;
+    return tip;
   }
 
   /** Resolves a command/config key to a disaster type. */
   public static Optional<DisasterType> fromKey(String value) {
     String normalized = value.toLowerCase(Locale.ROOT).replace('_', '-');
-    return Arrays.stream(values()).filter(type -> type.key.equals(normalized)).findFirst();
+    return Arrays.stream(values()).filter(type -> type.configKey.equals(normalized)).findFirst();
   }
 }
