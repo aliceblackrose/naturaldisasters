@@ -1,0 +1,47 @@
+# Natural Disasters round settings.
+rounds:
+  enabled: true
+  minimum-players: 1
+  intermission-seconds: 30
+  warning-seconds: 10
+  duration-seconds: 90
+
+  # Empty means every loaded world. Add exact world names to restrict rounds.
+  worlds: []
+
+disasters:
+  # Destructive block changes are disabled by default so the plugin is safe to test
+  # in an ordinary survival world. This currently affects meteors and lightning.
+  block-damage: false
+
+  earthquake:
+    enabled: true
+    damage: 1.0
+    knockback: 0.35
+
+  acid-rain:
+    enabled: true
+    damage: 2.0
+
+  lightning-storm:
+    enabled: true
+    interval-seconds: 2
+    damage: 5.0
+
+  meteor-shower:
+    enabled: true
+    interval-seconds: 2
+    radius: 8
+    power: 3.0
+
+  flash-flood:
+    enabled: true
+    damage: 3.0
+    rise-blocks: 18
+
+  tornado:
+    enabled: true
+    radius: 24.0
+    pull-strength: 0.45
+    lift: 0.25
+    damage: 1.0
